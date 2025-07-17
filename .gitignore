@@ -1,0 +1,8 @@
+/.vscode
+/.settings
+/Debug
+/Docs
+/html
+/latex
+/.metadata
+*.pyc
