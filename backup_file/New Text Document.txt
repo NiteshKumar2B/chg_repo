@@ -1,0 +1,1619 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2022 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include "measure.h"
+#include "utility.h"
+#include "math.h"
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
+FDCAN_HandleTypeDef hfdcan1;
+
+TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim6;
+
+UART_HandleTypeDef huart3;
+
+/* USER CODE BEGIN PV */
+uint8_t ubKeyNumber = 0x0;
+uint8_t ubKeyNumberValue = 0x0;
+FDCAN_RxHeaderTypeDef RxHeader;
+uint8_t RxData[8];
+FDCAN_TxHeaderTypeDef TxHeader;
+uint8_t TxData[8];
+uint16_t set_flag=0,CAN_Delay=0;
+uint32_t data=0,battery_voltage1=6700,error=0,soc_value=0,cc=0,cc_current=0;//6680
+uint16_t data1,data2,data3,data4,data5,data6,data7,data8,Can_comm_fail=0;
+uint8_t data_tx[8],flash_set=0;
+
+
+uint32_t PageError;
+
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_FDCAN1_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_USART3_UART_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM6_Init(void);
+/* USER CODE BEGIN PFP */
+static void FDCAN_Config(void);
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+unsigned int gain=200,gain3=0,model_set=0,led_gain=0,micro_sec=0,m_cal=1530,half_sec=0,batt_open_delay=0;
+unsigned int four_sec=0,ADC_VAL[5],mains_cnt=0,mains_rms_cal=15,batt_voltage=0,batt_volt12=0;
+volatile int mains_volt_avg=0,prev_batt_volt=0,batt_voltavg=0,avgbattvolt_cnts=0,chg_current_avg,prev_chg_crnt=0,batt_volt11=0;
+unsigned char mains_volt_cut=0,fan_on_flag=0,batt_charge_flag=0,mains_fail=0,chargdeating=0,sw_on=0,hi_cut_deb=0,start_recovery=0;
+unsigned char led_presentage=0,tweenty_percent=0,fifty_percent=0,seventy_percent=0,hundred_percent=0,batt_high_flag=0,buzzer_beep=0;
+unsigned char charge_flag=0,Battery_full=0, dis_cal=21,batt_cal=25,led_delay=0,reveived_flag=0;
+unsigned int temp=0,mains_volt=0,i=0,mains_debounce=0,prev_mains_volt=0,delay_on=0,one_min=0,one_sec=0,chg_cnt=0;
+unsigned int temp_adc_main=0,  main_cnt=0,temp_value=0,main_voltage=0,charg_offset=0,charging_current=0;
+float Batt_set_error=0;
+unsigned char can_comm_check=0,start=0;
+unsigned char two_sec=0,can_comm=0,cut_count=0,comm_fail=0,batt_open_mode=0,over_temp_protection=0,sett=0,over_current=0,retry_flag=0,batt_high=0;
+unsigned int led1=0,led2=0,led3=0,led4=0,led2_50=0,led1_25=0,led3_75,led4_100=0,soft_start=0;
+unsigned int main_cut_count=0,charge_delay=0,max_temp=85,chargde=0,avg_counts=0,chg_current=0; //75
+unsigned int Ro = 10000, B = 3977; //Nominal resistance 50K, Beta constant
+float R=0,r_value=0;// Series resistor 10K
+float To = 298.15,Vi=0;
+long T=0;
+float r_long=0; // Nominal Temperature
+int temperature=0,temperature_error=0,temperature_error1=0;
+unsigned int chg_cal=130,dischg_cal=30,Batt_recheck=0;
+uint32_t address,save_cal_flag,error_cc=0;
+uint32_t data;
+volatile unsigned int eeprom_add,eeprom_data,delay;
+   unsigned int local,sofar=0,local1,local2,s_test=0;
+  uint64_t flash_address= 0x08019000;
+// uint32_t flash_address[1]= { 0x08008004 };
+ // uint32_t flash_address[2]= { 0x08008008 } ;
+  uint64_t FData =  0x1111111199999999;
+
+
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_ADC1_Init();
+  MX_FDCAN1_Init();
+  MX_TIM1_Init();
+  MX_USART3_UART_Init();
+  MX_TIM3_Init();
+  MX_TIM6_Init();
+  /* USER CODE BEGIN 2 */
+  FDCAN_Config();
+ // HAL_TIM_Base_Start_IT(&htim3);
+  HAL_FDCAN_Start(&hfdcan1);
+  //HAL_TIM_Base_Start_IT(&htim16);
+
+  HAL_TIM_Base_Start_IT(&htim3);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+  init_cal_factors();
+ // HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+
+  //HAL_FLASH_Unlock();
+ // HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,flash_address,0X24);
+ // HAL_FLASH_Lock();
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+
+
+
+
+	            if(save_cal_flag==0xa5)
+	 	 	   	  {
+	 	 		     flash_page_erase(50);
+	 	 		     HAL_FLASH_Unlock();
+
+	 	 		    HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,flash_address,batt_cal);
+
+	 	 		     flash_address=0x08019010;
+	 	 		 	HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,flash_address,chg_cal);
+	 	 		 	flash_address=0x08019020;
+	 	 		    HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,flash_address,dischg_cal);
+	 	 	   	     HAL_FLASH_Lock();
+
+	 	 	   	     save_cal_flag=0; flash_address=0x08019000;   NVIC_SystemReset();
+
+
+	 	 	   	   }
+
+
+	      battery_voltage_measurement();
+	 	  charging_current= chg_current-15;
+	 	  if(charging_current<=0) { charging_current=0;}
+
+
+
+	 	      if (can_comm==1)
+	 	      {
+	 	        /* Set the data to be transmitted */
+	 	        TxData[0] = 0x00;//
+	 	        TxData[1] = 0x00;
+	 	        TxData[2] = 0x00;
+	 	       	TxData[3] = 0x00;
+	 	        TxData[4] = 0x00;
+	 	        TxData[5] = 0x00;
+	 	     	TxData[6] = 0x00;
+	 	     	TxData[7] = 0x00;
+
+	 	        /* Start the Transmission process */
+	 	        if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader,TxData) != HAL_OK)
+	 	        {
+	 	          /* Transmission request Error */
+	 	          Error_Handler();
+	 	        }
+	 	         HAL_Delay(5);
+	 	         can_comm=0;
+
+	 	        HAL_UART_Transmit (&huart3, data_tx, sizeof (data_tx), 1000);
+	 	      }
+
+
+
+	 	                mains_voltage();
+
+	 	              if(sw_on==1) {GPIOA->ODR |= 0x00000080; } // Relay on-off switch
+	 	              else {GPIOA->ODR &= 0xFFFFFF7F; }
+
+
+	 /*********************************************temperature**********************************************************************/
+	 	                   r_long=R/10000;
+	 	                   T =   1 / ((1 / To) + ((log(r_long)) / B));
+	 	                   temperature = T - 273.15+9; // Converting kelvin to celsius  //error factor +9
+
+	 	                  if(temperature>max_temp)
+	 	                  {
+	 	                	  temperature_error= (max_temp-temperature)*9;//10
+	 	                	  if(temperature_error>=-9) { temperature_error=-9;}//10
+
+	 	                  }
+	 	                  else {temperature_error=0;}
+
+
+	 /********************************************************one min loop*********************************************************************/
+
+	 	                             if(one_sec>60)
+	 	                              {
+	 	                            	 one_sec=0; //if(error<20) { can_comm=1; }
+	 	                            	 if( charge_flag==1) { one_min++; }
+	 	                            	 else { one_min=0;}
+
+
+
+
+	 	                            	    if(batt_voltage>battery_voltage1+1000) {batt_high=1; }
+	 	                            	    else if(batt_voltage<battery_voltage1-3000) {batt_high=0;}
+
+
+	 	                              }
+
+
+
+
+/******************************************Battery voltage Start************************************************************/
+	              if (avgbattvolt_cnts ==30)
+	       	  		{
+	       	  			batt_voltage = (batt_voltavg)/30;
+
+	       	  			avgbattvolt_cnts =0;
+	       	  			batt_voltavg =0;
+	       	  		}
+
+
+
+	              if(charging_current<50 && gain3>200 && Battery_full==0) // Battery open check
+	             	    {
+
+	             	      sw_on=0;
+	             	      if(ADC_VAL[4]>=2500)
+	             	        { batt_open_mode=1;charge_delay=0;charge_flag=0;Battery_full=0; }
+
+	             	        }
+
+
+	 /******************************************Battery voltage End ************************************************************/
+
+	       	   if(main_cut_count>1000) { main_cut_count=0;} else { main_cut_count++;}
+	 /******************************************CAN Communication Error check************************************************************/
+	       	                                if(error>20)
+	       	                                  {
+	       	                                	reveived_flag=0;charge_delay=0;charge_flag=0;error=21;
+	       	                                  }
+
+
+	 /******************************************Mains hi_low Cut***********************************************************/
+
+	       	 	                          if(main_voltage<100 || main_voltage>300)
+	       	 	                            {
+
+	       	 	                    		             if (hi_cut_deb >220)
+	       	 	                    						{
+	       	 	                    							mains_volt_cut = 1; start_recovery=0; charge_flag=0;Battery_full=0;
+
+	                                                          }
+	       	 	                    						else
+	       	 	                    							hi_cut_deb++;
+
+	       	 	                    		 }
+	       	 	                       else
+	       	 	                     		 {
+
+	       	 	                        	     hi_cut_deb = 0;
+	       	 	                     		  }
+
+	       	 	                   	if(main_cut_count>500 && mains_volt_cut==1) { led_control (mains_led,on);}
+	       	 	                      else if (mains_volt_cut==1){ led_control(mains_led,off);}
+
+
+
+	                                       if(start_recovery==0)
+	                                       {
+	       	 	                          if(main_voltage>115 && main_voltage<288)
+	       	 	                     				{
+	       	 	                     					if (mains_debounce >500)
+	       	 	                     					 {
+	       	 	                     						start_recovery = 1;
+	       	 	                     					    led_control (mains_led,on);
+	       	 	                     						mains_debounce = 0;
+	       	 	                     						mains_volt_cut=0;
+	       	 	                     						mains_debounce=500;
+	       	 	                     					 }
+	       	 	                     					else
+	       	 	                     						 {
+	       	 	                     						   mains_debounce++;
+	       	 	                     						 }
+	       	 	                     				}
+	       	 	                     				else
+	       	 	                     				{
+	       	 	                     					mains_debounce = 0;
+	       	 	                     					start_recovery = 0;
+	       	 	                     				}
+	                                       }
+
+
+	 /***********************************************Derating**************************************************************/
+	       	 	                     if(main_voltage<165 || main_voltage>280 ) //163 for 169
+	       	 	                       {
+	       	 	                    	  if(chargde<500) {chargde++;}
+	       	 	                    	  else {chargdeating=1;chargde=0; }
+	       	 	                    	        delay_on=0;
+
+	       	 	                       }
+	       	 	                     else if(main_voltage>175 && main_voltage<270 && chargdeating==1)//175 for 180
+	       	 	                        {
+
+	       	 	                    	    if(delay_on>5000)
+	       	 	                    	        {
+	       	 	                    	    	  chargdeating=0;
+	       	 	                    	        }
+	       	 	                    	    else
+	       	 	                    	      {
+	       	 	                    	    	delay_on++;
+	       	 	                    	      }
+	       	 	                    	      chargde=0;
+
+	       	 	                        }
+	       	 	                       else
+	       	 	                         {
+	       	 	                    	    delay_on=0;
+	       	 	                         }
+
+
+	 /****************************************SET MAX BATTERY AS PER CAN DATA***********************************************************/
+
+
+	       	 	                  Batt_set_error=(battery_voltage1-4600)/100; //5540  5600
+	       	 	                   gain=(200-(Batt_set_error/0.1142));
+	       	 	                   if(gain<=3) { gain=3;}
+	       	 	               		 if(gain>=200){ gain=200;}
+
+	 /***********************************************************************led % *********************************************************/
+	       	 	                led1=(battery_voltage1*10)/100;
+	       	 	                led1_25=battery_voltage1-led1;
+	       	 	                led2=(battery_voltage1*7.5)/100;
+	       	 	                led2_50=battery_voltage1-led2;
+	       	 	                led3=(battery_voltage1*5)/100;
+	       	 	                led3_75=battery_voltage1-led3;
+	       	 	                led4=(battery_voltage1*1.5)/100; //
+	       	 	                led4_100=battery_voltage1-led4;
+
+
+
+	     /*****************************************LED indication start**********************************************************/
+
+	    if(led_delay<50 && start_recovery==1 && over_temp_protection==0 && reveived_flag==1 && charging_current>40 && over_current==0 && mains_volt_cut==0 && batt_high==0 && batt_open_mode==0 && Battery_full==0)
+
+	       	 	                   {
+
+
+	       	 	                	     if(batt_volt12<led1_25){led_control (Twentypercent_led,on); }//6000
+	       	 	                	     else if(batt_volt12<led2_50) { led_control (fiftypercent_led,on);  }//6200
+	       	 	                	     else if(batt_volt12<led3_75 ) {  led_control (seventypercent_led,on);  }//6520
+	       	 	                	     else if(batt_volt12<led4_100 || batt_volt12>led4_100) {led_control (hundredpercent_led,on); }//6750
+
+
+	                                       led_control(fault_led,on);led_gain=25;
+
+
+
+
+
+	       	 	                   }
+
+	     else if(led_delay<=100 && start_recovery==1 && over_temp_protection==0 && reveived_flag==1 && charging_current>40 && over_current==0 && mains_volt_cut==0 && batt_high==0 && batt_open_mode==0 && Battery_full==0)
+	       	 	                   {
+	       	 	                	    if(batt_volt12<led1_25 )//6000
+	       	 	                	     { led_control (seventypercent_led,off);led_control (fiftypercent_led,off);led_control (Twentypercent_led,off);led_control (hundredpercent_led,off);}
+	       	 	                	     else if(batt_volt12<led2_50)//6200
+	       	 	                	     {led_control (seventypercent_led,off);led_control (fiftypercent_led,off);led_control (Twentypercent_led,on);led_control (hundredpercent_led,off);}
+	       	 	                	     else if(batt_volt12<led3_75)//6520
+	       	 	                	     {   led_control(fiftypercent_led,on);led_control (Twentypercent_led,on);led_control (seventypercent_led,off);led_control (hundredpercent_led,off);   }
+	       	 	                	     else if(batt_volt12<led4_100)//6750
+	       	 	                	     { led_control (seventypercent_led,on);led_control (fiftypercent_led,on);led_control (Twentypercent_led,on);led_control (hundredpercent_led,off); }
+	       	 	                	    else if(batt_volt12>led4_100 && Battery_full==0)//6750
+	       	 	                	     { led_control (seventypercent_led,on);led_control (fiftypercent_led,on);led_control (Twentypercent_led,on);led_control (hundredpercent_led,off); }
+	       	 	                	   else if(batt_volt12>led4_100 && Battery_full==1)//6750
+	       	 	                	     { led_control (seventypercent_led,on);led_control (fiftypercent_led,on);led_control (Twentypercent_led,on);led_control (hundredpercent_led,on); }
+
+
+
+	       	 	                	       led_control(fault_led,off);led_gain=0;
+
+	       	 	                   }
+
+	       	 	                 else
+	       	 	                 {
+
+	       	 	                	if(Battery_full==1 && over_temp_protection==0 && reveived_flag==1 && over_current==0 && mains_volt_cut==0 && batt_high==0)
+	       	 	                	{
+	       	 	                	 led_control (hundredpercent_led,on); led_control (seventypercent_led,on);led_control (fiftypercent_led,on);led_control (Twentypercent_led,on);
+
+	       	 	                	 led_control(fault_led,on);led_gain=0;
+	       	 	                	}
+	       	 	                	else
+	       	 	                	{
+	       	 	                	 led_control (hundredpercent_led,off); led_control (seventypercent_led,off);led_control (fiftypercent_led,off);led_control (Twentypercent_led,off);
+	       	 	                	 led_control(fault_led,off);// green led off
+	       	 	                	 if((mains_volt_cut==1 || reveived_flag==0 || over_temp_protection==1 || batt_open_mode==1 || over_current==1 && batt_high==1 || batt_open_mode==1 ) && Battery_full==0)
+	       	 	                	    {led_gain=200; led_control(buzzer_led,on);}  // red dual led on
+	       	 	                	  else {led_gain=0;}
+	       	 	                	}
+
+
+
+
+	       	 	                 }
+
+
+
+	       	 	                    TIM1->CCR3=led_gain;
+
+
+/*************************************************Fault Indication LED and Buzzer and over temp ****************************************************************/
+	       	 	                 if(led_delay>=100)
+	       	 	                      {
+	       	 	                	    led_delay=0;
+
+	       	 	                	    if(Battery_full==0)
+	       	 	                	    {
+	       	 	                        if(mains_volt_cut==1 || reveived_flag==0 || over_temp_protection==1 || batt_open_mode==1 || over_current==1 || batt_high==1)
+	       	 	                         {
+	       	 	                        	if (cut_count>1)
+	       	 	                        		{
+	       	 	                        		 // led_gain=200;
+	       	 	                        		  led_control(buzzer_led,on); charge_delay=0;
+	       	 	                        		  if(cut_count>1){cut_count=0;}
+	       	 	                        		}
+	       	 	                        	else
+	       	 	                        	{
+	       	 	                        	   //led_gain=200;
+	       	 	                        	  led_control(buzzer_led,off);
+
+	       	 	                        	}
+
+	       	 	                            cut_count++;
+
+	       	 	                         }
+	       	 	                        else
+	       	 	                        {
+
+
+	       	 	                           cut_count=0; led_control(buzzer_led,off);
+
+
+	       	 	                        }
+
+	       	 	                	  }
+	       	 	                	    else
+	       	 	                	    {
+	       	 	                	     if(Battery_full==1 && buzzer_beep<60) { buzzer_beep++;led_control(buzzer_led,on);}
+	       	 	                	     else {led_control(buzzer_led,off); }
+
+	       	 	                	    }
+
+	       	 	                       error++;
+
+	                                 if(temperature>=99) //83
+	       	 	                       {
+	       	 	                    	 over_temp_protection=1;
+	       	 	                       }
+
+
+	       	 	               	   else if(over_temp_protection==1 && temperature<65)
+	       	 	               	       {    over_temp_protection=0;}
+
+
+	                                  if(over_current==1 && charging_current<200)
+	                                       	 {
+	                                       	     over_current=0;
+	                                       	 }
+
+
+	                                 getTemp();
+
+
+
+
+
+
+	    if( over_temp_protection==0 && start_recovery==1 && reveived_flag==1  && batt_high==0 && batt_open_mode==0 && over_current==0) //6800 & Battery_full=0;
+
+	                            {
+	                                if(charge_flag==1 && (one_min>=150 || charging_current<100)  && mains_volt_cut==0)  //1.3 hours 2.5
+	                                       {
+	                                           Battery_full=1;
+	                                        }
+
+                                    else if (charge_flag==1 && (batt_voltage<battery_voltage1-(battery_voltage1*15/100))) //6500
+	                                         {
+	                                           Battery_full=0;one_min=0;charge_flag=0;buzzer_beep=0;
+	                                          }
+	                             }
+
+
+                          }
+
+
+                           if(four_sec>20)
+	       	 	              {
+	       	 	            	  four_sec=0; two_sec++;led_delay++; batt_open_delay++;
+
+	       	 	              }
+
+
+	           ADC_Select_CH0();
+	 		  HAL_ADC_Start(&hadc1);
+	 		  HAL_ADC_PollForConversion(&hadc1, 1000);
+	 		  ADC_VAL[0] = HAL_ADC_GetValue(&hadc1);
+	 		  HAL_ADC_Stop(&hadc1);
+
+
+	 		  ADC_Select_CH1(); //
+	 		  HAL_ADC_Start(&hadc1);
+	 		  HAL_ADC_PollForConversion(&hadc1, 1000);
+	 		  ADC_VAL[1] = HAL_ADC_GetValue(&hadc1);
+	 		  temp_adc_main=ADC_VAL[1];
+	 		  HAL_ADC_Stop(&hadc1);
+
+	 		  ADC_Select_CH2();
+	 		  HAL_ADC_Start(&hadc1);
+	 		  HAL_ADC_PollForConversion(&hadc1, 1000);
+	 		  ADC_VAL[2] = HAL_ADC_GetValue(&hadc1);
+	 		  HAL_ADC_Stop(&hadc1);
+
+
+	 		  ADC_Select_CH3();
+	 		  HAL_ADC_Start(&hadc1);
+	 		  HAL_ADC_PollForConversion(&hadc1, 1000);
+	 		  ADC_VAL[3] = HAL_ADC_GetValue(&hadc1);
+	 		  HAL_ADC_Stop(&hadc1);
+
+
+	 		  ADC_Select_CH4();
+	 		  HAL_ADC_Start(&hadc1);
+	 		  HAL_ADC_PollForConversion(&hadc1, 1000);
+	 		  ADC_VAL[4] = HAL_ADC_GetValue(&hadc1);
+	 		  HAL_ADC_Stop(&hadc1);
+
+
+
+
+
+
+  }
+  /* USER CODE END 3 */
+}
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSIDiv = RCC_HSI_DIV1;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
+  RCC_OscInitStruct.PLL.PLLN = 8;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.LowPowerAutoPowerOff = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_1CYCLE_5;
+  hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_1CYCLE_5;
+  hadc1.Init.OversamplingMode = DISABLE;
+  hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  *
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  *
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  *
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = ADC_REGULAR_RANK_3;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  *
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = ADC_REGULAR_RANK_4;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  *
+  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Rank = ADC_REGULAR_RANK_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  *
+  sConfig.Channel = ADC_CHANNEL_5;
+  sConfig.Rank = ADC_REGULAR_RANK_6;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  *
+  sConfig.Channel = ADC_CHANNEL_6;
+  sConfig.Rank = ADC_REGULAR_RANK_7;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief FDCAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_FDCAN1_Init(void)
+{
+
+  /* USER CODE BEGIN FDCAN1_Init 0 */
+
+  /* USER CODE END FDCAN1_Init 0 */
+
+  /* USER CODE BEGIN FDCAN1_Init 1 */
+
+  /* USER CODE END FDCAN1_Init 1 */
+  hfdcan1.Instance = FDCAN1;
+  hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
+  hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
+  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan1.Init.AutoRetransmission = ENABLE;
+  hfdcan1.Init.TransmitPause = ENABLE;
+  hfdcan1.Init.ProtocolException = DISABLE;
+  hfdcan1.Init.NominalPrescaler = 4;
+  hfdcan1.Init.NominalSyncJumpWidth = 33;
+  hfdcan1.Init.NominalTimeSeg1 = 47;
+  hfdcan1.Init.NominalTimeSeg2 = 16;
+  hfdcan1.Init.DataPrescaler = 2;
+  hfdcan1.Init.DataSyncJumpWidth = 15;
+  hfdcan1.Init.DataTimeSeg1 = 16;
+  hfdcan1.Init.DataTimeSeg2 = 15;
+  hfdcan1.Init.StdFiltersNbr = 0;
+  hfdcan1.Init.ExtFiltersNbr = 1;
+  hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+  if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN FDCAN1_Init 2 */
+
+  /* USER CODE END FDCAN1_Init 2 */
+
+}
+
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 8;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 200;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.BreakFilter = 0;
+  sBreakDeadTimeConfig.BreakAFMode = TIM_BREAK_AFMODE_INPUT;
+  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
+  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
+  sBreakDeadTimeConfig.Break2Filter = 0;
+  sBreakDeadTimeConfig.Break2AFMode = TIM_BREAK_AFMODE_INPUT;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+  HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 8-1;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 1000-1;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 4;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 200;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_14|GPIO_PIN_15, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7|GPIO_PIN_15, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
+                          |GPIO_PIN_7|GPIO_PIN_8, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PC14 PC15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_14|GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA7 PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB0 PB4 PB5 PB6
+                           PB7 PB8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6
+                          |GPIO_PIN_7|GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+}
+
+/* USER CODE BEGIN 4 */
+static void FDCAN_Config(void)
+{
+  FDCAN_FilterTypeDef sFilterConfig;
+
+  /* Configure Rx filter */
+  sFilterConfig.IdType = FDCAN_EXTENDED_ID;
+  sFilterConfig.FilterIndex = 0;
+  sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  sFilterConfig.FilterID1 = 0x18904001;//90
+  sFilterConfig.FilterID2 = 0x18900140 ; //0x7ff
+  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Configure global filter:
+     Filter all remote frames with STD and EXT ID
+     Reject non matching frames with STD ID and EXT ID */
+  if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Start the FDCAN module */
+  if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Prepare Tx Header */
+  TxHeader.Identifier = 0x18900140;
+  TxHeader.IdType = FDCAN_EXTENDED_ID;
+  TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+  TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+  TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+  TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+  TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  TxHeader.MessageMarker = 0;
+}
+
+
+
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+  if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
+  {
+    /* Retrieve Rx messages from RX FIFO0 */
+    if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
+    {
+      Error_Handler();
+
+
+    }
+
+     /*Display LEDx */
+   if ((RxHeader.Identifier ==0x18904001) && (RxHeader.IdType == FDCAN_EXTENDED_ID) && (RxHeader.DataLength == FDCAN_DLC_BYTES_8))
+    {
+
+         reveived_flag =1;
+
+    }
+
+     error =1;
+
+  }
+
+}
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+
+	temp_measurement();
+	current_measurement();
+	 TIM3->CCR4=gain3;
+
+
+
+
+
+	                                   if(mains_volt_cut==1 || batt_voltage<5200) {buzzer_beep=0;}
+
+
+	         	 	                     if(chg_current>1200  && over_current==0)
+	            	 	                     {
+
+	            	 	                    	over_current=1;
+
+	            	 	                     }
+
+
+if(micro_sec>4800)
+{
+	 micro_sec=0;one_sec++; Batt_recheck++;
+	 if(batt_voltage>=(battery_voltage1-300) && chg_current>100) //95% charged battery
+		  {
+
+		                if(charge_delay>100)//100us
+		                    {
+
+		                       charge_flag=1;charge_delay=101;
+		                     }
+		                else
+		                {
+		                	charge_delay++;
+		                }
+
+	 	   }
+  	 else if(over_temp_protection==1 ||  batt_high==1 || batt_open_mode==1)
+ 		{charge_flag=0; }
+
+
+
+   }
+
+
+	 four_sec++;  if(four_sec>20) { four_sec=0; two_sec++;led_delay++;}
+
+	  if(two_sec>70) { two_sec=0; charging_control();can_comm_check++; }
+	  if(can_comm_check>2 && error<5){can_comm_check=0;can_comm=1;}
+
+  if(over_current==1) { sw_on=0;gain3=0;gain=200;}
+
+	    if(main_cnt>500)
+	    	    {
+
+	    		  mains_volt_avg=mains_volt_avg/main_cnt;
+	    		  main_voltage=mains_volt_avg*0.2314;
+	    		  mains_volt_avg=0;main_cnt=0;
+
+	    	    }
+	    	   else
+	    	    {
+	    		  mains_volt_avg=mains_volt+mains_volt_avg;
+	    		  main_cnt++;
+	    	    }
+
+        data1 =RxData[0];
+	    data1=data1<<8;
+		data2= RxData[1];
+		//battery_voltage1=data1+data2;
+		//battery_voltage1=battery_voltage1*10;
+	    data3 =RxData[2];
+	  	data3=data3<<8;
+	    data4= RxData[3];
+	    cc=(data3+data4);
+	    cc=cc/10;
+	    data5 =RxData[4];
+	  	data5=data5<<8;
+	  	data6= RxData[5];
+	  	cc_current=data5+data6;
+	  	cc_current=cc_current/1000;
+	    data7 =RxData[6];
+	  	data7=data7<<8;
+	  	data8= RxData[7];
+	  	soc_value=(data7+data8);
+	  	soc_value=soc_value/10;
+
+
+
+
+
+        if (avg_counts>9000)
+           	 {
+           	     batt_volt11=batt_volt11/avg_counts;
+           	     batt_volt12=batt_volt11;
+           	     avg_counts=0; batt_volt11=0;
+
+               }
+            else
+            {
+                batt_volt11=batt_voltage+batt_volt11;
+                avg_counts++;
+            }
+
+
+
+                                    if(batt_open_mode==1)
+  	 	                                {
+  	 	                                  if(Batt_recheck>=15)  {batt_open_mode=0;}
+  	 	                                }
+
+  	 	                              else { Batt_recheck=0;}
+
+
+
+
+
+
+}
+
+
+
+
+void ADC_Select_CH0 (void)
+{
+	  ADC_ChannelConfTypeDef sConfig = {0};
+	  sConfig.Channel = ADC_CHANNEL_0;
+	  sConfig.Rank = ADC_REGULAR_RANK_1;
+	  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
+}
+
+void ADC_Select_CH1 (void)
+{
+	  ADC_ChannelConfTypeDef sConfig = {0};
+	  sConfig.Channel = ADC_CHANNEL_1;
+	  sConfig.Rank = ADC_REGULAR_RANK_1;
+	  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
+}
+
+void ADC_Select_CH2 (void)
+{
+	  ADC_ChannelConfTypeDef sConfig = {0};
+	  sConfig.Channel = ADC_CHANNEL_2;
+	  sConfig.Rank = ADC_REGULAR_RANK_1;
+	  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
+}
+
+void ADC_Select_CH3 (void)
+{
+	  ADC_ChannelConfTypeDef sConfig = {0};
+	  sConfig.Channel = ADC_CHANNEL_3;
+	  sConfig.Rank = ADC_REGULAR_RANK_1;
+	  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
+}
+
+void ADC_Select_CH4 (void)
+{
+	  ADC_ChannelConfTypeDef sConfig = {0};
+	  sConfig.Channel = ADC_CHANNEL_6;
+	  sConfig.Rank = ADC_REGULAR_RANK_1;
+	  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
+}
+
+ void getTemp(void)
+  	 	 {
+  	        Vi = ADC_VAL[2] * (3.3 / 4096.0);
+  	        R = (Vi *2000) / (3.3 - Vi);
+
+
+         }
+
+
+
+
+void PWM_output_control (unsigned int duty_ctrl)
+{
+	   //TIM1->CCR1 =  duty_ctrl;
+}
+
+
+void charging_control (void)
+  {
+
+
+	if( over_temp_protection==0 && start_recovery==1 && reveived_flag==1 && chargdeating==0 && Battery_full==0 && batt_high==0 && batt_open_mode==0) //6800
+	     {
+		     sw_on=1; if(temperature_error>=0) {  gain3=gain3+8; }
+		               else
+		                 {
+		            	    if(temperature_error>=-90) { temperature_error1=temperature_error; }
+		            	     else { temperature_error1=-90;}
+		            	      gain3=900+temperature_error1;
+		            	      temperature_error1=0;
+
+		                 }
+		 }
+
+	else if(batt_voltage<=battery_voltage1 && over_temp_protection==0 && start_recovery==1 && reveived_flag==1 && chargdeating==1 && Battery_full==0 && over_current==0 && batt_high==0 && batt_open_mode==0) //6800
+		         {
+			     sw_on=1; if(gain3<=500) { gain3=gain3+8;} else { gain3=500;}
+			 }
+	    else
+	     {
+
+		     sw_on=0;gain3=0;gain=200;
+
+	     }
+
+
+
+
+
+		 if(gain<=3) { gain=3;}
+		 if(gain>=200){ gain=200;}
+		 if(gain3<=0) { gain3=0;}
+		 if(gain3>900){gain3=900; }
+		 PWM_output_control(gain);
+
+  }
+
+void flash_page_erase(uint32_t page)
+
+{
+
+   HAL_FLASH_Unlock();
+
+
+
+   FLASH_EraseInitTypeDef FLASH_EraseInitStruct =
+
+       {
+
+       .TypeErase = FLASH_TYPEERASE_PAGES,
+
+      .Page = page,
+
+      .NbPages =1,
+
+       };
+
+   HAL_FLASHEx_Erase(&FLASH_EraseInitStruct,&error_cc);
+
+   HAL_FLASH_Lock();
+   error_cc=0;
+}
+
+
+
+void init_cal_factors (void)
+{
+volatile unsigned int eeprom_add,eeprom_data;
+unsigned char local;
+
+eeprom_add = 0x08019000;
+local = *((unsigned char*)eeprom_add);
+eeprom_data = local;
+eeprom_data = eeprom_data;
+
+eeprom_add = 0x08019000;
+local = *((unsigned char*)eeprom_add);
+eeprom_data |= local;
+
+batt_cal = eeprom_data;
+
+if ((batt_cal <2)|(batt_cal >255))
+batt_cal = 25;//163;
+
+
+eeprom_data = 0;eeprom_add=0;
+eeprom_add = 0x08019010;
+local = *((unsigned char*)eeprom_add);
+eeprom_data = local;
+eeprom_data = eeprom_data;
+
+eeprom_add = 0x08019010;
+local = *((unsigned char*)eeprom_add);
+eeprom_data |= local;
+
+chg_cal = eeprom_data;
+
+if ((chg_cal < 2)|(chg_cal >255))
+	chg_cal = 163;//163;
+
+eeprom_data = 0;eeprom_add=0;
+eeprom_add = 0x08019020;
+local = *((unsigned char*)eeprom_add);
+eeprom_data = local;
+eeprom_data = eeprom_data;
+
+eeprom_add = 0x08019020;
+local = *((unsigned char*)eeprom_add);
+eeprom_data |= local;
+
+dischg_cal = eeprom_data;
+
+if ((dischg_cal < 2)|(dischg_cal >255))
+	dischg_cal = 163;//163;
+
+/*
+eeprom_data = 0;
+eeprom_add = 0x4004;
+local = *((unsigned char*)eeprom_add);
+eeprom_data = local;
+eeprom_data = eeprom_data<<8;
+
+eeprom_add = 0x4005;
+local = *((unsigned char*)eeprom_add);
+eeprom_data |= local;
+
+dischg_cal = eeprom_data;
+
+if ((dischg_cal < 5)|(dischg_cal > 100))
+dischg_cal = 30;//22;//15;//21;
+
+
+eeprom_data = 0;
+eeprom_add = 0x4006;
+local = *((unsigned char*)eeprom_add);
+eeprom_data = local;
+eeprom_data = eeprom_data<<8;
+
+eeprom_add = 0x4007;
+local = *((unsigned char*)eeprom_add);
+eeprom_data |= local;
+
+boost_batt_volt = eeprom_data;
+
+if ((boost_batt_volt < 137)|(boost_batt_volt > 150))
+boost_batt_volt = 143;//56;//94;
+
+batt_volt_ref = boost_batt_volt;
+
+eeprom_data = 0;
+eeprom_add = 0x4008;
+local = *((unsigned char*)eeprom_add);
+eeprom_data = local;
+eeprom_data = eeprom_data<<8;
+
+eeprom_add = 0x4009;
+local = *((unsigned char*)eeprom_add);
+eeprom_data |= local;
+
+output_cal = eeprom_data;
+
+if ((output_cal < 1)|(output_cal > 100))
+output_cal = 67;//75;//69;//96;//68;
+
+
+
+eeprom_data = 0;
+eeprom_add = 0x400A;
+local = *((unsigned char*)eeprom_add);
+eeprom_data = local;
+eeprom_data = eeprom_data<<8;
+
+eeprom_add = 0x400B;
+local = *((unsigned char*)eeprom_add);
+eeprom_data |= local;
+
+mains_rms_cal = eeprom_data;
+
+if ((mains_rms_cal < 1)|(mains_rms_cal > 160))
+mains_rms_cal = 115;//126;//123;*/
+
+
+//FLASH_IAPSR &= 0xF7;
+//FLASH->CR |=0X00000001;
+}
+
+
+void save_cal_factors (void)
+{
+volatile unsigned int eeprom_add,delay;
+unsigned char local;
+
+//FLASH_DUKR = 0xAE;
+//FLASH_DUKR = 0x56;
+//FLASH->KEYR = 0x45670123;
+//FLASH->KEYR= 0xCDEF89ABU;
+
+eeprom_add = 0x08008000;
+local = batt_cal;
+*((unsigned char*)eeprom_add) = local;
+delay = 50000;
+while (delay--);
+
+eeprom_add = 0x08000010;
+local = batt_cal;
+*((unsigned char*)eeprom_add) = local;
+delay = 50000;
+while (delay--);
+FLASH->CR |=0X00000001;
+
+}
+
+
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
